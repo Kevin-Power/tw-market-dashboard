@@ -22,6 +22,7 @@ import { DailyUpload } from "./DailyUpload";
 import { DownloadCenter } from "./DownloadCenter";
 import { MarketBriefing } from "./MarketBriefing";
 import { AutoFetch } from "./AutoFetch";
+import { SetupWizard } from "./SetupWizard";
 import {
   downloadClientPack,
   downloadMarket,
@@ -74,7 +75,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
     initialMeta?.updatedAt ?? new Date().toISOString(),
   );
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState("foreign");
+  const [tab, setTab] = useState("setup");
   const [menuOpen, setMenuOpen] = useState(false);
   const [packBusy, setPackBusy] = useState(false);
 
@@ -136,7 +137,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
                 </span>
               </div>
               <p className="mt-1 text-sm text-muted">
-                證交所自動籌碼 · 客戶報表 · 每日更新
+                請先完成「上線導引」→ 自動籌碼 → 客戶下載
               </p>
             </div>
           </div>
@@ -217,16 +218,6 @@ export function Dashboard({ initial, initialMeta }: Props) {
                     )}
                     客戶交付包
                   </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 border-t border-border px-3.5 py-2.5 text-left text-xs text-muted hover:bg-surface-2"
-                    onClick={() => {
-                      setTab("download");
-                      setMenuOpen(false);
-                    }}
-                  >
-                    開啟下載中心…
-                  </button>
                 </div>
               )}
             </div>
@@ -236,7 +227,6 @@ export function Dashboard({ initial, initialMeta }: Props) {
               onClick={() => void refresh()}
               disabled={refreshing}
               className="btn-ghost disabled:opacity-50"
-              title="重新載入最新資料"
             >
               {refreshing ? (
                 <Loader2 className="size-3.5 animate-spin" />
@@ -263,21 +253,29 @@ export function Dashboard({ initial, initialMeta }: Props) {
           </div>
         </div>
 
-        <Tabs
-          value={tab}
-          onValueChange={setTab}
-          className="fade-in stagger-4"
-        >
+        <Tabs value={tab} onValueChange={setTab} className="fade-in stagger-4">
           <TabsList>
+            <TabsTrigger value="setup">① 上線導引</TabsTrigger>
+            <TabsTrigger value="upload">② 每日更新</TabsTrigger>
             <TabsTrigger value="foreign">外資籌碼</TabsTrigger>
             <TabsTrigger value="trust">投信籌碼</TabsTrigger>
             <TabsTrigger value="highs">一年新高</TabsTrigger>
             <TabsTrigger value="lows">一年新低</TabsTrigger>
-            <TabsTrigger value="0050">0050 持股</TabsTrigger>
+            <TabsTrigger value="0050">0050</TabsTrigger>
             <TabsTrigger value="download">下載中心</TabsTrigger>
-            <TabsTrigger value="upload">每日更新</TabsTrigger>
-            <TabsTrigger value="gas">部署／GAS</TabsTrigger>
+            <TabsTrigger value="gas">部署細節</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="setup">
+            <SetupWizard />
+          </TabsContent>
+
+          <TabsContent value="upload">
+            <div className="space-y-4">
+              <AutoFetch onUpdated={apply} />
+              <DailyUpload onUpdated={apply} />
+            </div>
+          </TabsContent>
 
           <TabsContent value="foreign">
             <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
@@ -329,13 +327,6 @@ export function Dashboard({ initial, initialMeta }: Props) {
             <DownloadCenter data={data} />
           </TabsContent>
 
-          <TabsContent value="upload">
-            <div className="space-y-4">
-              <AutoFetch onUpdated={apply} />
-              <DailyUpload onUpdated={apply} />
-            </div>
-          </TabsContent>
-
           <TabsContent value="gas">
             <GasGuide />
           </TabsContent>
@@ -347,7 +338,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
             <span className="font-mono text-muted">{data.asOfLabel}</span>
             {" · "}
             {sourceLabel(source)}
-            {" · "}機構研究用資訊彙整{" · "}非投資建議
+            {" · "}非投資建議
           </p>
         </footer>
       </main>
