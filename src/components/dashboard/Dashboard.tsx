@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Download,
   FileSpreadsheet,
+  FileText,
   Loader2,
   Printer,
   RefreshCw,
@@ -21,6 +22,7 @@ import { DailyUpload } from "./DailyUpload";
 import { DownloadCenter } from "./DownloadCenter";
 import { MarketBriefing } from "./MarketBriefing";
 import {
+  downloadClientPack,
   downloadMarket,
   openHtmlReport,
 } from "@/lib/export-market";
@@ -58,6 +60,7 @@ function sourceLabel(source: string): string {
   if (source === "daily-upload") return "今日上傳";
   if (source === "gas") return "GAS 推送";
   if (source === "seed") return "示範資料";
+  if (source === "file" || source === "verify-file") return "本機快照";
   if (source === "api" || source === "verify") return "正式資料";
   return source;
 }
@@ -71,6 +74,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState("foreign");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [packBusy, setPackBusy] = useState(false);
 
   const apply = useCallback(
     (next: MarketData, meta: { updatedAt: string; source: string }) => {
@@ -103,9 +107,13 @@ export function Dashboard({ initial, initialMeta }: Props) {
 
   useEffect(() => {
     if (!menuOpen) return;
-    const close = () => setMenuOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.("[data-report-menu]")) return;
+      setMenuOpen(false);
+    };
+    document.addEventListener("click", onDoc);
+    return () => document.removeEventListener("click", onDoc);
   }, [menuOpen]);
 
   return (
@@ -126,7 +134,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
                 </span>
               </div>
               <p className="mt-1 text-sm text-muted">
-                機構研究 · 籌碼日報 · 客戶交付下載
+                機構研究簡報 · 客戶報表 · 每日更新 · Render 就緒
               </p>
             </div>
           </div>
@@ -143,24 +151,18 @@ export function Dashboard({ initial, initialMeta }: Props) {
               每日更新
             </span>
 
-            <div className="relative">
+            <div className="relative" data-report-menu>
               <button
                 type="button"
                 className="btn-primary h-9 rounded-full px-3.5 text-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen((v) => !v);
-                }}
+                onClick={() => setMenuOpen((v) => !v)}
               >
                 <Download className="size-3.5" />
                 客戶報告
                 <ChevronDown className="size-3.5 opacity-70" />
               </button>
               {menuOpen && (
-                <div
-                  className="absolute right-0 z-40 mt-2 w-52 overflow-hidden rounded-xl border border-border bg-surface shadow-panel"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <div className="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-surface py-1 shadow-panel">
                   <button
                     type="button"
                     className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-fg hover:bg-surface-2"
@@ -170,7 +172,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
                     }}
                   >
                     <Printer className="size-3.5 text-primary" />
-                    HTML / 另存 PDF
+                    HTML 報告 → PDF
                   </button>
                   <button
                     type="button"
@@ -191,8 +193,27 @@ export function Dashboard({ initial, initialMeta }: Props) {
                       setMenuOpen(false);
                     }}
                   >
-                    <Download className="size-3.5 text-primary" />
+                    <FileText className="size-3.5 text-primary" />
                     文字摘要
+                  </button>
+                  <button
+                    type="button"
+                    disabled={packBusy}
+                    className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-fg hover:bg-surface-2 disabled:opacity-50"
+                    onClick={() => {
+                      setPackBusy(true);
+                      void downloadClientPack(data).finally(() => {
+                        setPackBusy(false);
+                        setMenuOpen(false);
+                      });
+                    }}
+                  >
+                    {packBusy ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Download className="size-3.5 text-primary" />
+                    )}
+                    客戶交付包
                   </button>
                   <button
                     type="button"
@@ -256,7 +277,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
             <TabsTrigger value="0050">0050 持股</TabsTrigger>
             <TabsTrigger value="download">下載中心</TabsTrigger>
             <TabsTrigger value="upload">每日更新</TabsTrigger>
-            <TabsTrigger value="gas">GAS 範例</TabsTrigger>
+            <TabsTrigger value="gas">部署／GAS</TabsTrigger>
           </TabsList>
 
           <TabsContent value="foreign">
@@ -322,8 +343,8 @@ export function Dashboard({ initial, initialMeta }: Props) {
           <p className="text-xs text-subtle">
             資料日{" "}
             <span className="font-mono text-muted">{data.asOfLabel}</span>
-            {" · "}文件 TWFLOW-
-            {data.asOf.replace(/-/g, "")}
+            {" · "}
+            {sourceLabel(source)}
             {" · "}機構研究用資訊彙整{" · "}非投資建議
           </p>
         </footer>

@@ -1,11 +1,20 @@
-import { useState } from "react";
-import { Check, Copy, CloudUpload, Webhook } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Activity,
+  Check,
+  Copy,
+  CloudUpload,
+  ExternalLink,
+  FileSpreadsheet,
+  HeartPulse,
+  Webhook,
+} from "lucide-react";
 
 const CODE_GS = `/**
  * 台股籌碼看板 · GAS 每日推送
  * 1. 試算表工作表：外資投信、一年新高、一年新低、儀表板
- * 2. 指令碼屬性：DASHBOARD_URL、MARKET_TOKEN（可選）
- * 3. 執行 setupDailyTrigger() → 每日 15:30 自動 buildAndPush()
+ * 2. 指令碼屬性：DASHBOARD_URL（Render 網址）、MARKET_TOKEN（= 伺服器 MARKET_UPDATE_TOKEN）
+ * 3. 執行 setupDailyTrigger() → 每個交易日約 15:30 自動 buildAndPush()
  */
 
 const SHEETS = {
@@ -18,7 +27,9 @@ const SHEETS = {
 function buildAndPush() {
   const payload = buildMarketPayload_();
   writeDashSummary_(payload);
-  pushToDashboard_(payload);
+  const res = pushToDashboard_(payload);
+  Logger.log(JSON.stringify(res));
+  return res;
 }
 
 function buildMarketPayload_() {
@@ -69,6 +80,7 @@ function readHighs_(ss) {
   for (var i = 0; i < values.length; i++) {
     var r = values[i];
     if (!r[0] || !r[1] || typeof r[2] !== 'number') continue;
+    if (String(r[0]) === '代號') continue;
     out.push({ code: String(r[0]), name: String(r[1]), price: r[2], change: Number(r[3])||0, changePct: Number(r[4])||0,
       volRank: null, volHighDays: null, vol: null, volChange: null, amountM: null, amountRank: null, amountHighDays: null });
   }
@@ -82,9 +94,9 @@ function readLows_(ss) {
   const holdings = [], lows = [];
   for (var i = 0; i < values.length; i++) {
     var r = values[i];
-    if (r[1] && typeof r[2] === 'number' && typeof r[3] === 'number')
+    if (r[1] && typeof r[2] === 'number' && typeof r[3] === 'number' && String(r[1]) !== '股票名稱')
       holdings.push({ name: String(r[1]), sharesK: r[2], weight: r[3], change: r[4] });
-    if (r[7] && r[8] && typeof r[9] === 'number')
+    if (r[7] && r[8] && typeof r[9] === 'number' && String(r[7]) !== '代號')
       lows.push({ code: String(r[7]), name: String(r[8]), price: r[9], high: r[10], low: r[11],
         change: r[12], changePct: r[13], histHigh: r[23], fromHistHigh: r[24], histLow: r[25], fromHistLow: r[26], y10High: r[15], fromY10High: r[16] });
   }
@@ -103,17 +115,18 @@ function writeDashSummary_(payload) {
 function pushToDashboard_(payload) {
   const props = PropertiesService.getScriptProperties();
   const base = (props.getProperty('DASHBOARD_URL') || '').replace(/\\/$/, '');
-  if (!base) { Logger.log('Set DASHBOARD_URL first'); return; }
+  if (!base) { Logger.log('Set DASHBOARD_URL first'); return { error: 'no_url' }; }
   const headers = { 'Content-Type': 'application/json' };
   const token = props.getProperty('MARKET_TOKEN');
   if (token) headers['X-Market-Token'] = token;
-  UrlFetchApp.fetch(base + '/api/market', {
+  const res = UrlFetchApp.fetch(base + '/api/market', {
     method: 'post',
     contentType: 'application/json',
     headers: headers,
     payload: JSON.stringify({ data: payload, source: 'gas' }),
     muteHttpExceptions: true,
   });
+  return { code: res.getResponseCode(), body: res.getContentText() };
 }
 
 function setupDailyTrigger() {
@@ -125,8 +138,57 @@ function setupDailyTrigger() {
 }
 `;
 
+type Health = {
+  ok: boolean;
+  asOf?: string;
+  source?: string;
+  storage?: string;
+  counts?: { highs: number; lows: number; holdings: number };
+  ms?: number;
+};
+
+const RENDER_STEPS = [
+  {
+    title: "GitHub 已就緒",
+    body: "程式在 Kevin-Power/tw-market-dashboard（含 render.yaml）",
+  },
+  {
+    title: "Render → New → Blueprint",
+    body: "連接該 repo，確認 Build = build:render、Start = start:render",
+  },
+  {
+    title: "部署完成後驗收",
+    body: "開 /api/health → ok:true，再測 /api/export?format=xlsx",
+  },
+  {
+    title: "（建議）接 Neon",
+    body: "環境變數 DATABASE_URL，避免 Free 休眠後資料重置",
+  },
+  {
+    title: "每日更新",
+    body: "看板上傳三份 Excel，或 GAS 設 DASHBOARD_URL + MARKET_TOKEN",
+  },
+];
+
 export function GasGuide() {
   const [copied, setCopied] = useState(false);
+  const [health, setHealth] = useState<Health | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/health", { cache: "no-store" });
+        const j = (await res.json()) as Health;
+        if (!cancelled) setHealth(j);
+      } catch {
+        if (!cancelled) setHealth({ ok: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function copy() {
     try {
@@ -140,6 +202,57 @@ export function GasGuide() {
 
   return (
     <div className="space-y-4">
+      <div className="panel p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary">
+              <HeartPulse className="size-5" strokeWidth={1.75} />
+            </div>
+            <div>
+              <p className="section-label">Live status</p>
+              <h3 className="mt-1 text-base font-semibold text-fg text-display">
+                系統狀態
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                健康檢查與目前儲存後端（file = 本機／Free，postgres = Neon）
+              </p>
+            </div>
+          </div>
+          {health && (
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={
+                  health.ok
+                    ? "chip chip-live"
+                    : "chip border-up/30 bg-up/10 text-up"
+                }
+              >
+                <Activity className="size-3.5" />
+                {health.ok ? "健康" : "異常"}
+              </span>
+              {health.asOf && (
+                <span className="chip">
+                  資料日
+                  <span className="font-mono text-fg">{health.asOf}</span>
+                </span>
+              )}
+              {health.storage && (
+                <span className="chip">
+                  儲存
+                  <span className="font-mono text-fg">{health.storage}</span>
+                </span>
+              )}
+              {health.counts && (
+                <span className="chip">
+                  高{health.counts.highs}/低{health.counts.lows}/0050{" "}
+                  {health.counts.holdings}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="panel flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:gap-4 sm:p-6">
           <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface-2 text-primary">
@@ -147,18 +260,33 @@ export function GasGuide() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="section-label">Deploy</p>
-            <h3 className="mt-1 text-sm font-semibold text-fg">部署到 Render</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              專案已附{" "}
-              <code className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-primary">
-                render.yaml
-              </code>
-              。推到 GitHub 後用 Blueprint 一鍵部署。建議設{" "}
-              <code className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-primary">
-                MARKET_UPDATE_TOKEN
-              </code>{" "}
-              保護每日推送。
-            </p>
+            <h3 className="mt-1 text-sm font-semibold text-fg">
+              部署到 Render（Blueprint）
+            </h3>
+            <ol className="mt-3 space-y-2.5 text-sm text-muted">
+              {RENDER_STEPS.map((s, i) => (
+                <li key={s.title} className="flex gap-2.5">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 font-mono text-[11px] text-primary">
+                    {i + 1}
+                  </span>
+                  <span>
+                    <span className="font-medium text-fg">{s.title}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-subtle">
+                      {s.body}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <a
+              href="https://github.com/Kevin-Power/tw-market-dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-ghost mt-4 h-10 rounded-xl px-3.5 text-xs"
+            >
+              <ExternalLink className="size-3.5" />
+              開啟 GitHub repo
+            </a>
           </div>
         </div>
         <div className="panel flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:gap-4 sm:p-6">
@@ -167,16 +295,24 @@ export function GasGuide() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="section-label">API</p>
-            <h3 className="mt-1 text-sm font-semibold text-fg">每日介面</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              <code className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-primary">
-                GET /api/market
-              </code>{" "}
-              讀取 ·{" "}
-              <code className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-primary">
-                POST /api/market
-              </code>{" "}
-              寫入。看板每 5 分鐘自動重抓。
+            <h3 className="mt-1 text-sm font-semibold text-fg">對外介面</h3>
+            <ul className="mt-3 space-y-2 font-mono text-[11px] text-muted sm:text-xs">
+              <li>
+                <span className="text-primary">GET</span> /api/health
+              </li>
+              <li>
+                <span className="text-primary">GET</span> /api/market
+              </li>
+              <li>
+                <span className="text-primary">POST</span> /api/market
+              </li>
+              <li>
+                <span className="text-primary">GET</span>{" "}
+                /api/export?format=xlsx|html|summary
+              </li>
+            </ul>
+            <p className="mt-3 text-xs leading-relaxed text-subtle">
+              客戶下載中心可複製永久連結。看板每 5 分鐘自動重抓。
             </p>
           </div>
         </div>
@@ -189,7 +325,11 @@ export function GasGuide() {
               <p className="section-label">Script</p>
               <h3 className="mt-0.5 text-sm font-semibold text-fg">Code.gs</h3>
             </div>
-            <button type="button" onClick={copy} className="btn-ghost h-10 px-3.5">
+            <button
+              type="button"
+              onClick={() => void copy()}
+              className="btn-ghost h-10 px-3.5"
+            >
               {copied ? (
                 <>
                   <Check className="size-4 text-down" />
@@ -207,24 +347,35 @@ export function GasGuide() {
             {CODE_GS}
           </pre>
         </div>
-        <div className="panel p-5 sm:p-6 lg:col-span-2">
-          <p className="section-label">Workflow</p>
-          <h3 className="mt-1 text-sm font-semibold text-fg">每日更新流程</h3>
-          <ol className="mt-5 space-y-4 text-sm text-muted">
-            {[
-              "收盤後匯出三份 Excel（外資投信／新高／新低）",
-              "看板「每日更新」直接上傳，或貼入 Google 試算表",
-              "GAS 觸發器執行 buildAndPush → POST /api/market",
-              "看板資料日與表格自動換成最新交易日",
-            ].map((text, i) => (
-              <li key={text} className="flex gap-3">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2 font-mono text-xs font-semibold text-primary">
-                  {i + 1}
-                </span>
-                <span className="pt-1 leading-relaxed">{text}</span>
-              </li>
-            ))}
-          </ol>
+        <div className="panel space-y-5 p-5 sm:p-6 lg:col-span-2">
+          <div>
+            <p className="section-label">Workflow</p>
+            <h3 className="mt-1 text-sm font-semibold text-fg">每日更新流程</h3>
+            <ol className="mt-4 space-y-3.5 text-sm text-muted">
+              {[
+                "收盤後匯出三份 Excel（外資投信／新高／新低）",
+                "看板「每日更新」直接上傳（同源免 token）",
+                "或貼入試算表 → GAS buildAndPush",
+                "客戶從「下載中心」取 Excel／HTML 報告",
+              ].map((text, i) => (
+                <li key={text} className="flex gap-3">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2 font-mono text-xs font-semibold text-primary">
+                    {i + 1}
+                  </span>
+                  <span className="pt-1 leading-relaxed">{text}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="rounded-2xl border border-dashed border-border-strong/80 bg-bg/30 p-3.5 text-xs leading-relaxed text-subtle">
+            <div className="mb-1.5 flex items-center gap-1.5 font-medium text-muted">
+              <FileSpreadsheet className="size-3.5" />
+              指令碼屬性
+            </div>
+            DASHBOARD_URL = https://你的服務.onrender.com
+            <br />
+            MARKET_TOKEN = Render 環境變數 MARKET_UPDATE_TOKEN
+          </div>
         </div>
       </div>
     </div>

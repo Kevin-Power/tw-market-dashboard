@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { dbSource } from "@/lib/db";
-import { getMarketSnapshot } from "@/lib/market.server";
+import {
+  getMarketSnapshot,
+  marketStorageMode,
+} from "@/lib/market.server";
 
 /**
  * Lightweight health for Render / load balancers.
@@ -17,9 +19,16 @@ export const Route = createFileRoute("/api/health")({
             {
               ok: true,
               service: "tw-market-dashboard",
+              version: "1.0.0",
               asOf: snap.data.asOf,
+              asOfLabel: snap.data.asOfLabel,
               source: snap.source,
-              db: dbSource,
+              storage: snap.storage ?? marketStorageMode(),
+              counts: {
+                highs: snap.data.highs.stocks.length,
+                lows: snap.data.lows.lows.length,
+                holdings: snap.data.lows.holdings.length,
+              },
               ms: Date.now() - started,
               ts: new Date().toISOString(),
             },
@@ -28,6 +37,7 @@ export const Route = createFileRoute("/api/health")({
               headers: {
                 "Cache-Control": "no-store",
                 "X-Market-AsOf": snap.data.asOf,
+                "X-Market-Storage": snap.storage ?? marketStorageMode(),
               },
             },
           );
@@ -37,7 +47,7 @@ export const Route = createFileRoute("/api/health")({
             {
               ok: false,
               error: err instanceof Error ? err.message : String(err),
-              db: dbSource,
+              storage: marketStorageMode(),
               ms: Date.now() - started,
             },
             { status: 503, headers: { "Cache-Control": "no-store" } },

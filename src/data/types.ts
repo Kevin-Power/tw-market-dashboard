@@ -80,5 +80,6 @@ export type MarketApiResponse = MarketData & {
     daily: boolean;
     highCount?: number;
     lowCount?: number;
+    storage?: "postgres" | "file" | string;
   };
 };

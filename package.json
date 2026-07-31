@@ -19,7 +19,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "data:verify": "node scripts/verify-market.mjs",
-    "start:render": "node scripts/render-start.mjs"
+    "start:render": "node scripts/render-start.mjs",
+    "verify:deploy": "node scripts/verify-deploy.mjs"
   },
   "engines": {
     "node": ">=20"

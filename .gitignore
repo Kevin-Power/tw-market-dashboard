@@ -14,3 +14,4 @@ tmp
 .playwright
 coverage
 *.tsbuildinfo
+data/

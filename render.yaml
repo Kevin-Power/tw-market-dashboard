@@ -1,15 +1,13 @@
 # Render Blueprint — 台股籌碼看板
-# Dashboard → New → Blueprint → 連接 GitHub repo
-# Docs: https://render.com/docs/blueprint-spec
+# https://dashboard.render.com → New → Blueprint
+# Repo: https://github.com/Kevin-Power/tw-market-dashboard
 services:
   - type: web
     name: tw-market-dashboard
     runtime: node
     plan: free
     region: singapore
-    # Build: Nitro node-server + SSR CSS fix (no Vercel preset)
     buildCommand: npm ci && npm run build:render
-    # Start: migrate (if DATABASE_URL) then Nitro
     startCommand: npm run start:render
     healthCheckPath: /api/health
     autoDeploy: true
@@ -24,9 +22,8 @@ services:
         value: "0.0.0.0"
       - key: NITRO_HOST
         value: "0.0.0.0"
-      # GAS / 上傳 API 寫入保護（建議在 Dashboard 改成自己的密鑰）
+      # GAS / 外部 POST 用；看板同源上傳不需此 token
       - key: MARKET_UPDATE_TOKEN
         generateValue: true
-      # 可選：Neon / 外部 Postgres 連線字串（持久化每日資料）
-      # - key: DATABASE_URL
-      #   sync: false
+      # 可選：Neon connection string（持久化每日資料）
+      # 在 Dashboard 手動新增 DATABASE_URL 即可

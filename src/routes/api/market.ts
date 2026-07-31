@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   getMarketSnapshot,
   saveMarketSnapshot,
+  marketStorageMode,
 } from "@/lib/market.server";
 import type { MarketData } from "@/data/types";
 import { parseMarketData } from "@/lib/market-schema";
@@ -33,7 +34,7 @@ function json(data: unknown, init: ResponseInit = {}, request?: Request) {
  * Write protection for POST /api/market.
  * - No MARKET_UPDATE_TOKEN → open (demo / internal)
  * - Matching X-Market-Token / Bearer → allowed (GAS, cron)
- * - Same-origin browser (看板「每日更新」) → allowed without embedding secret in client
+ * - Same-origin browser (看板「每日更新」) → allowed without embedding secret
  */
 function authorizeWrite(request: Request): boolean {
   const token = process.env.MARKET_UPDATE_TOKEN?.trim();
@@ -47,13 +48,13 @@ function authorizeWrite(request: Request): boolean {
   if (request.headers.get("Sec-Fetch-Site") === "same-origin") return true;
 
   const origin = request.headers.get("Origin");
-  const host = request.headers.get("Host") || request.headers.get("X-Forwarded-Host");
+  const host =
+    request.headers.get("Host") || request.headers.get("X-Forwarded-Host");
   if (origin && host) {
     try {
       const o = new URL(origin);
       const hostOnly = host.split(",")[0]!.trim().split(":")[0];
-      const originHost = o.hostname;
-      if (originHost === hostOnly || o.host === host.trim()) return true;
+      if (o.hostname === hostOnly || o.host === host.trim()) return true;
     } catch {
       /* ignore */
     }
@@ -80,7 +81,7 @@ export const Route = createFileRoute("/api/market")({
                 daily: true,
                 highCount: snap.data.highs.stocks.length,
                 lowCount: snap.data.lows.lows.length,
-                db: process.env.DATABASE_URL ? "neon" : "pglite",
+                storage: snap.storage ?? marketStorageMode(),
               },
             },
             {
@@ -148,6 +149,7 @@ export const Route = createFileRoute("/api/market")({
               asOf: snap.data.asOf,
               source: snap.source,
               updatedAt: snap.updatedAt,
+              storage: snap.storage,
               counts: {
                 highs: snap.data.highs.stocks.length,
                 lows: snap.data.lows.lows.length,
