@@ -1,0 +1,16 @@
+node_modules
+.output
+.vercel
+.nitro
+dist
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+screenshots
+.cache
+tmp
+.playwright
+coverage
+*.tsbuildinfo
