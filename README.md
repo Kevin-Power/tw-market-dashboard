@@ -13,6 +13,12 @@
 - **每日更新**：三份 Excel 上傳或 GAS
 - API：`/api/market` · `/api/export` · `/api/health`
 
+## 每日自動籌碼
+
+- 看板「每日更新」→ **立即抓取最新交易日**（證交所／櫃買）
+- 或排程 `POST /api/cron/daily?force=1`（GAS 每日 16:00）
+- 資料來源：TWSE T86、櫃買三大法人、收盤行情
+
 ## 5 分鐘上 Render
 
 1. [Render](https://dashboard.render.com) → **New** → **Blueprint**

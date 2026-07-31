@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiExportRouteImport } from './routes/api/export'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMarketRouteImport } from './routes/api/market'
+import { Route as ApiCronDailyRouteImport } from './routes/api/cron/daily'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const ApiMarketRoute = ApiMarketRouteImport.update({
   path: '/api/market',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronDailyRoute = ApiCronDailyRouteImport.update({
+  id: '/api/cron/daily',
+  path: '/api/cron/daily',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/export': typeof ApiExportRoute
   '/api/health': typeof ApiHealthRoute
   '/api/market': typeof ApiMarketRoute
+  '/api/cron/daily': typeof ApiCronDailyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/export': typeof ApiExportRoute
   '/api/health': typeof ApiHealthRoute
   '/api/market': typeof ApiMarketRoute
+  '/api/cron/daily': typeof ApiCronDailyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,21 @@ export interface FileRoutesById {
   '/api/export': typeof ApiExportRoute
   '/api/health': typeof ApiHealthRoute
   '/api/market': typeof ApiMarketRoute
+  '/api/cron/daily': typeof ApiCronDailyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/export' | '/api/health' | '/api/market'
+  fullPaths:
+    '/' | '/api/export' | '/api/health' | '/api/market' | '/api/cron/daily'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/export' | '/api/health' | '/api/market'
-  id: '__root__' | '/' | '/api/export' | '/api/health' | '/api/market'
+  to: '/' | '/api/export' | '/api/health' | '/api/market' | '/api/cron/daily'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/export'
+    | '/api/health'
+    | '/api/market'
+    | '/api/cron/daily'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +83,7 @@ export interface RootRouteChildren {
   ApiExportRoute: typeof ApiExportRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMarketRoute: typeof ApiMarketRoute
+  ApiCronDailyRoute: typeof ApiCronDailyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMarketRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/daily': {
+      id: '/api/cron/daily'
+      path: '/api/cron/daily'
+      fullPath: '/api/cron/daily'
+      preLoaderRoute: typeof ApiCronDailyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +131,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExportRoute: ApiExportRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMarketRoute: ApiMarketRoute,
+  ApiCronDailyRoute: ApiCronDailyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

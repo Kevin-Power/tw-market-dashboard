@@ -21,6 +21,7 @@ import { GasGuide } from "./GasGuide";
 import { DailyUpload } from "./DailyUpload";
 import { DownloadCenter } from "./DownloadCenter";
 import { MarketBriefing } from "./MarketBriefing";
+import { AutoFetch } from "./AutoFetch";
 import {
   downloadClientPack,
   downloadMarket,
@@ -59,6 +60,7 @@ function formatUpdatedAt(iso: string): string {
 function sourceLabel(source: string): string {
   if (source === "daily-upload") return "今日上傳";
   if (source === "gas") return "GAS 推送";
+  if (source === "twse-live") return "證交所自動";
   if (source === "seed") return "示範資料";
   if (source === "file" || source === "verify-file") return "本機快照";
   if (source === "api" || source === "verify") return "正式資料";
@@ -134,7 +136,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
                 </span>
               </div>
               <p className="mt-1 text-sm text-muted">
-                機構研究簡報 · 客戶報表 · 每日更新 · Render 就緒
+                證交所自動籌碼 · 客戶報表 · 每日更新
               </p>
             </div>
           </div>
@@ -148,7 +150,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-50" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-primary" />
               </span>
-              每日更新
+              {sourceLabel(source)}
             </span>
 
             <div className="relative" data-report-menu>
@@ -257,10 +259,7 @@ export function Dashboard({ initial, initialMeta }: Props) {
             <HighsChart data={data} />
           </div>
           <div className="lg:col-span-2">
-            <MarketBriefing
-              data={data}
-              sourceLabel={sourceLabel(source)}
-            />
+            <MarketBriefing data={data} sourceLabel={sourceLabel(source)} />
           </div>
         </div>
 
@@ -331,7 +330,10 @@ export function Dashboard({ initial, initialMeta }: Props) {
           </TabsContent>
 
           <TabsContent value="upload">
-            <DailyUpload onUpdated={apply} />
+            <div className="space-y-4">
+              <AutoFetch onUpdated={apply} />
+              <DailyUpload onUpdated={apply} />
+            </div>
           </TabsContent>
 
           <TabsContent value="gas">
